@@ -29,11 +29,12 @@ local moving_mobs = world
 	:query(Transform, Velocity)
 	:with(Mob)
 	:cached()
+	
 
 local lastupdate = 0
 local function mobsMove(dt: number)
 	lastupdate += dt
-	if lastupdate < 0.016 then return end -- 60hz
+	if lastupdate < 0.064 then return end -- 30hz
 	lastupdate = 0
 
 	local targets = {}
