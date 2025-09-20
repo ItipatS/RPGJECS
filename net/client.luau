@@ -150,45 +150,65 @@ local Queue: any = {
     Unreliable = table.create(256)
 }
 
-Queue.Unreliable[0] = CreateQueue()
+Queue.Unreliable[0] = table.create(256)
 Queue.Reliable[0] = CreateQueue()
-local function ReadEVENT_UpdateTransform(): (number, CFrame)
-	-- Read BLOCK: 26 bytes
-	local BLOCK_START = Read(26)
-	local Encoded = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
-	local Value1
-	local MantissaExponent = Encoded % 0x8000
-	if MantissaExponent == 0b0_11111_0000000000  then
-		if Encoded // 0x8000 == 1 then
-			Value1 = -math.huge
+export type Transform = { id: number, dp: Vector3 }
+local function ReadEVENT_UpdateTransformDelta(): ({ { id: number, dp: Vector3 } })
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	-- START ARRAY
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	if Length < 0 then error(`Expected "Length" to be larger than 0, got {Length} instead.`) end
+	if Length > 65535 then error(`Expected "Length" to be smaller than 65535, got {Length} instead.`) end
+	local Value = table.create(Length)
+		-- Read BLOCK: 14 bytes
+	local ARRAY_START_1 = Read(14 * Length)
+	for Index = 1, Length do
+		local Item_1 = {} :: any
+		-- Read 2
+		local OPERATION_OFFSET_0 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		local Encoded = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_0)
+		local MantissaExponent = Encoded % 0x8000
+		if MantissaExponent == 0b0_11111_0000000000  then
+			if Encoded // 0x8000 == 1 then
+				Item_1.id = -math.huge
+			else
+				Item_1.id = math.huge
+			end
+		elseif MantissaExponent == 0b1_11111_0000000000   then
+			Item_1.id = 0 / 0
+		elseif MantissaExponent == 0b0_00000_0000000000   then
+			Item_1.id = 0
 		else
-			Value1 = math.huge
+			local Mantissa = MantissaExponent % 0x400
+			local Exponent = MantissaExponent // 0x400
+			local Fraction;
+			if Exponent == 0 then
+				Fraction = Mantissa / 0x400
+			else
+				Fraction = Mantissa / 0x800 + 0.5
+			end
+			local Result = math.ldexp(Fraction, Exponent - 14)
+			Item_1.id = if Encoded // 0x8000 == 1 then -Result else Result
 		end
-	elseif MantissaExponent == 0b1_11111_0000000000   then
-		Value1 = 0 / 0
-	elseif MantissaExponent == 0b0_00000_0000000000   then
-		Value1 = 0
-	else
-		local Mantissa = MantissaExponent % 0x400
-		local Exponent = MantissaExponent // 0x400
-		local Fraction;
-		if Exponent == 0 then
-			Fraction = Mantissa / 0x400
-		else
-			Fraction = Mantissa / 0x800 + 0.5
-		end
-		local Result = math.ldexp(Fraction, Exponent - 14)
-		Value1 = if Encoded // 0x8000 == 1 then -Result else Result
+		-- Read 4
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local X = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_1)
+		-- Read 4
+		local OPERATION_OFFSET_2 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local Y = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_2)
+		-- Read 4
+		local OPERATION_OFFSET_3 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local Z = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_3)
+		Item_1.dp = Vector3.new(X, Y, Z)
+		table.insert(Value, Item_1)
 	end
-	local X = buffer.readf32(RecieveBuffer, BLOCK_START + 2)
-	local Y = buffer.readf32(RecieveBuffer, BLOCK_START + 6)
-	local Z = buffer.readf32(RecieveBuffer, BLOCK_START + 10)
-	local Position = Vector3.new(X, Y, Z)
-	local rX = buffer.readf32(RecieveBuffer, BLOCK_START + 14)
-	local rY = buffer.readf32(RecieveBuffer, BLOCK_START + 18)
-	local rZ = buffer.readf32(RecieveBuffer, BLOCK_START + 22)
-	local Value2 = CFrame.new(Position) * CFrame.fromOrientation(rX, rY, rZ)
-	return Value1, Value2
+	-- END ARRAY
+	return Value
 end
 
 local function ReadEVENT_SpawnMob(): (number, CFrame, number)
@@ -234,9 +254,8 @@ end
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-	UpdateTransform = {
-		Iter = NOOP,
-		Next = NOOP
+	UpdateTransformDelta = {
+		On = NOOP
 	},
 	SpawnMob = {
 		Iter = NOOP,
@@ -295,7 +314,10 @@ Unreliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 		if Index == 0 then
-			Push(Queue.Unreliable[0], table.pack(ReadEVENT_UpdateTransform()))
+			local Value: { { id: number, dp: Vector3 } } = ReadEVENT_UpdateTransformDelta()
+			if Events.Unreliable[0] ~= nil then
+				Events.Unreliable[0](Value)
+			end
 		end
 	end
 end)
@@ -304,30 +326,13 @@ end)
 local Returns = table.freeze({
 	StepReplication = StepReplication,
 
-	UpdateTransform = {
-		Iter = function(): () -> (number, number, CFrame)
-			local index = 0
-			local queue = Queue.Unreliable[0]
-			return function (): (number, number, CFrame)
-				index += 1
-				local arguments = Pop(queue)
-				if arguments ~= nil then
-					return index, unpack(arguments, 1, arguments.n)
+	UpdateTransformDelta = {
+		On = function(Listener: (Value: { { id: number, dp: Vector3 } }) -> ()): () -> ()
+			Events.Unreliable[0] = Listener
+			return function (): ()
+				if Events.Unreliable[0] == Listener then
+					Events.Unreliable[0] = nil
 				end
-				return 
-			end
-		end,
-		--- @deprecated v0.14.1 -- Use `Iter` instead.
-		Next = function(): () -> (number, number, CFrame)
-			local index = 0
-			local queue = Queue.Unreliable[0]
-			return function (): (number, number, CFrame)
-				index += 1
-				local arguments = Pop(queue)
-				if arguments ~= nil then
-					return index, unpack(arguments, 1, arguments.n)
-				end
-				return 
 			end
 		end
 	},

@@ -151,41 +151,58 @@ local Queue: any = {
     Unreliable = table.create(256)
 }
 
-local function WriteEVENT_UpdateTransform(Value1: number, Value2: CFrame): ()
-	-- Allocate BLOCK: 27 bytes
-	local BLOCK_START = Allocate(27)
+export type Transform = { id: number, dp: Vector3 }
+local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector3 } }): ()
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
-	if Value1 > 65504 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b0_11111_0000000000)
-	elseif Value1 < -65504 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b1_11111_0000000000)
-	elseif Value1 ~= Value1 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b1_11111_0000000001)
-	elseif Value1 == 0 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0)
-	else
-		local float = Value1
-		local Abosulte = math.abs(float)
-		local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
-		local RoundedValue = (Abosulte // Interval) * Interval
-		local Fraction, Exponent = math.frexp(RoundedValue)
-		Exponent += 14
-		local Mantissa = math.round(if Exponent <= 0
-			then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))
-			else Fraction * 0x800) % 0x400
-		local Result = Mantissa
-			+ math.max(Exponent, 0) * 0x400
-			+ if float < 0 then 0x8000 else 0
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, Result)
+	-- START ARRAY
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, #Value)
+		-- Allocate BLOCK: 14 bytes
+	local ARRAY_START_1 = Allocate(14 * #Value)
+	for Index = 1, #Value do
+		local Item_1 = Value[Index]
+		-- Allocate 2
+		local OPERATION_OFFSET_0 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		if Item_1.id > 65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b0_11111_0000000000)
+		elseif Item_1.id < -65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b1_11111_0000000000)
+		elseif Item_1.id ~= Item_1.id then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b1_11111_0000000001)
+		elseif Item_1.id == 0 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0)
+		else
+			local float = Item_1.id
+			local Abosulte = math.abs(float)
+			local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
+			local RoundedValue = (Abosulte // Interval) * Interval
+			local Fraction, Exponent = math.frexp(RoundedValue)
+			Exponent += 14
+			local Mantissa = math.round(if Exponent <= 0
+				then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))
+				else Fraction * 0x800) % 0x400
+			local Result = Mantissa
+				+ math.max(Exponent, 0) * 0x400
+				+ if float < 0 then 0x8000 else 0
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, Result)
+		end
+		local Vector = Item_1.dp
+		-- Allocate 4
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_1, Vector.X)
+		-- Allocate 4
+		local OPERATION_OFFSET_2 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_2, Vector.Y)
+		-- Allocate 4
+		local OPERATION_OFFSET_3 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_3, Vector.Z)
 	end
-	local Vector = Value2.Position
-	buffer.writef32(SendBuffer, BLOCK_START + 3, Vector.X)
-	buffer.writef32(SendBuffer, BLOCK_START + 7, Vector.Y)
-	buffer.writef32(SendBuffer, BLOCK_START + 11, Vector.Z)
-	local rX, rY, rZ = Value2:ToOrientation()
-	buffer.writef32(SendBuffer, BLOCK_START + 15, rX)
-	buffer.writef32(SendBuffer, BLOCK_START + 19, rY)
-	buffer.writef32(SendBuffer, BLOCK_START + 23, rZ)
+	-- END ARRAY
 end
 
 local function WriteEVENT_SpawnMob(Value1: number, Value2: CFrame, Value3: number): ()
@@ -229,7 +246,7 @@ end
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-	UpdateTransform = {
+	UpdateTransformDelta = {
 		Fire = NOOP,
 		FireAll = NOOP,
 		FireList = NOOP,
@@ -317,33 +334,33 @@ end)
 local Returns = table.freeze({
 	StepReplication = StepReplication,
 
-	UpdateTransform = {
-		Fire = function(Player: Player, Value1: number, Value2: CFrame): ()
+	UpdateTransformDelta = {
+		Fire = function(Player: Player, Value: { { id: number, dp: Vector3 } }): ()
 			Load()
-			WriteEVENT_UpdateTransform(Value1, Value2)
+			WriteEVENT_UpdateTransformDelta(Value)
 			local Buffer = buffer.create(SendCursor)
 			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
 			Unreliable:FireClient(Player, Buffer, SendInstances)
 		end,
-		FireAll = function(Value1: number, Value2: CFrame): ()
+		FireAll = function(Value: { { id: number, dp: Vector3 } }): ()
 			Load()
-			WriteEVENT_UpdateTransform(Value1, Value2)
+			WriteEVENT_UpdateTransformDelta(Value)
 			local Buffer = buffer.create(SendCursor)
 			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
 			Unreliable:FireAllClients(Buffer, SendInstances)
 		end,
-		FireList = function(List: {Player}, Value1: number, Value2: CFrame): ()
+		FireList = function(List: {Player}, Value: { { id: number, dp: Vector3 } }): ()
 			Load()
-			WriteEVENT_UpdateTransform(Value1, Value2)
+			WriteEVENT_UpdateTransformDelta(Value)
 			local Buffer = buffer.create(SendCursor)
 			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
 			for _, Player in List do
 				Unreliable:FireClient(Player, Buffer, SendInstances)
 			end
 		end,
-		FireExcept = function(Except: Player, Value1: number, Value2: CFrame): ()
+		FireExcept = function(Except: Player, Value: { { id: number, dp: Vector3 } }): ()
 			Load()
-			WriteEVENT_UpdateTransform(Value1, Value2)
+			WriteEVENT_UpdateTransformDelta(Value)
 			local Buffer = buffer.create(SendCursor)
 			buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
 			for _, Player in Players:GetPlayers() do

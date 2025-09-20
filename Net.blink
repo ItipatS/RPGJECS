@@ -1,12 +1,16 @@
 option ClientOutput = "net/client.luau"
 option ServerOutput = "net/server.luau"
 
-event UpdateTransform {
+struct Transform {
+    id: f16,
+    dp: vector<f32>,
+}
+event UpdateTransformDelta {
     From: Server,
     Type: Unreliable,
     Call: SingleSync,
-    Poll: true,
-    Data: (f16, CFrame)
+    Poll: false,
+    Data: Transform[]
 }
 
 event SpawnMob {
