@@ -85,6 +85,5 @@ local function system2()
 end
 local scheduler = require(std.scheduler)
 
-scheduler.SYSTEM(system2)
 
 return 0

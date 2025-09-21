@@ -40,7 +40,7 @@ dependencies = []
 [[package]]
 name = "marcus/demo"
 version = "0.1.0"
-dependencies = [["Lyra", "paradoxum-games/lyra@0.6.0"], ["Quid", "6531503070/quid@1.0.1"], ["Signal", "sleitnick/signal@1.5.0"], ["TableUtil", "sleitnick/table-util@1.2.1"], ["cmdr", "evaera/cmdr@1.12.0"], ["jabby", "alicesaidhi/jabby@0.2.2"], ["sha256", "dekkonot/sha256@1.0.1"], ["vide", "centau/vide@0.3.1"], ["zoneplus", "mattschrubb/zoneplus@3.2.0"]]
+dependencies = [["Lyra", "paradoxum-games/lyra@0.6.0"], ["Quid", "6531503070/quid@1.0.1"], ["Signal", "sleitnick/signal@1.5.0"], ["TableUtil", "sleitnick/table-util@1.2.1"], ["cmdr", "evaera/cmdr@1.12.0"], ["jabby", "alicesaidhi/jabby@0.2.2"], ["jecs", "ukendio/jecs@0.9.0"], ["sha256", "dekkonot/sha256@1.0.1"], ["vide", "centau/vide@0.3.1"], ["zoneplus", "mattschrubb/zoneplus@3.2.0"]]
 
 [[package]]
 name = "mattschrubb/zoneplus"
@@ -70,4 +70,9 @@ dependencies = []
 [[package]]
 name = "ukendio/jecs"
 version = "0.5.5"
+dependencies = []
+
+[[package]]
+name = "ukendio/jecs"
+version = "0.9.0"
 dependencies = []

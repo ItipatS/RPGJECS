@@ -2,7 +2,7 @@
   <img src="assets/image-5.png" width=35%/>
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE) [![Wally](https://img.shields.io/github/v/tag/ukendio/jecs?&style=for-the-badge)](https://wally.run/package/ukendio/jecs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE) [![Wally](https://img.shields.io/github/v/tag/ukendio/jecs?&style=for-the-badge)](https://wally.run/package/ukendio/jecs) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ukendio/jecs/unit-testing.yaml?&style=for-the-badge)](https://github.com/Ukendio/jecs/actions/workflows/unit-testing.yaml)
 
 Just a stupidly fast Entity Component System
 
@@ -12,7 +12,22 @@ Just a stupidly fast Entity Component System
 -   Zero-dependency package
 -   Optimized for column-major operations
 -   Cache friendly [archetype/SoA](https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9) storage
--   Rigorously [unit tested](https://github.com/Ukendio/jecs/actions/workflows/ci.yaml) for stability
+-   Rigorously [unit tested](https://github.com/Ukendio/jecs/actions/workflows/unit-testing.yaml) for stability
+
+### Installation
+
+With [Wally](https://wally.run/):
+```bash
+jecs = "ukendio/jecs@0.6.0" # Inside wally.toml
+```
+With [pesde](https://pesde.dev/):
+```bash
+pesde add wally#ukendio/jecs@0.6.0
+```
+With [npm](https://www.npmjs.com/package/@rbxts/jecs) ([roblox-ts](https://roblox-ts.com/)):
+```bash
+npm i @rbxts/jecs
+```
 
 ### Example
 
@@ -45,8 +60,8 @@ world:set(sara, Name, "sara")
 
 print(getName(parent(sara)))
 
-for e in world:query(pair(ChildOf, alice)) do
-    print(getName(e), "is the child of alice")
+for e, name in world:query(Name, pair(ChildOf, alice)) do
+    print(name, "is the child of alice")
 end
 
 -- Output
@@ -54,6 +69,8 @@ end
 -- bob is the child of alice
 -- sara is the child of alice
 ```
+
+### Benchmarks
 
 21,000 entities 125 archetypes 4 random components queried.
 ![Queries](assets/image-3.png)

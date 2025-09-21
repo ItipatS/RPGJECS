@@ -151,8 +151,10 @@ local Queue: any = {
 }
 
 Queue.Unreliable[0] = table.create(256)
-Queue.Reliable[0] = CreateQueue()
+Queue.Reliable[0] = table.create(256)
+Queue.Reliable[1] = CreateQueue()
 export type Transform = { id: number, dp: Vector3 }
+export type TransformFull = { id: number, dp: Vector3 }
 local function ReadEVENT_UpdateTransformDelta(): ({ { id: number, dp: Vector3 } })
 	-- Read BLOCK: 2 bytes
 	local BLOCK_START = Read(2)
@@ -260,6 +262,41 @@ local function ReadEVENT_UpdateTransformDelta(): ({ { id: number, dp: Vector3 } 
 	return Value
 end
 
+local function ReadEVENT_UpdateTransformFull(): ({ { id: number, dp: Vector3 } })
+	-- Read BLOCK: 2 bytes
+	local BLOCK_START = Read(2)
+	-- START ARRAY
+	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+	if Length < 0 then error(`Expected "Length" to be larger than 0, got {Length} instead.`) end
+	if Length > 65535 then error(`Expected "Length" to be smaller than 65535, got {Length} instead.`) end
+	local Value = table.create(Length)
+		-- Read BLOCK: 14 bytes
+	local ARRAY_START_1 = Read(14 * Length)
+	for Index = 1, Length do
+		local Item_1 = {} :: any
+		-- Read 2
+		local OPERATION_OFFSET_0 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		Item_1.id = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_0)
+		-- Read 4
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local X = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_1)
+		-- Read 4
+		local OPERATION_OFFSET_2 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local Y = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_2)
+		-- Read 4
+		local OPERATION_OFFSET_3 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		local Z = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_3)
+		Item_1.dp = Vector3.new(X, Y, Z)
+		table.insert(Value, Item_1)
+	end
+	-- END ARRAY
+	return Value
+end
+
 local function ReadEVENT_SpawnMob(): (number, CFrame, number)
 	-- Read BLOCK: 27 bytes
 	local BLOCK_START = Read(27)
@@ -306,6 +343,9 @@ if not RunService:IsRunning() then
 	UpdateTransformDelta = {
 		On = NOOP
 	},
+	UpdateTransformFull = {
+		On = NOOP
+	},
 	SpawnMob = {
 		Iter = NOOP,
 		Next = NOOP
@@ -348,7 +388,17 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 		if Index == 0 then
-			Push(Queue.Reliable[0], table.pack(ReadEVENT_SpawnMob()))
+			local Value: { { id: number, dp: Vector3 } } = ReadEVENT_UpdateTransformFull()
+			if Events.Reliable[0] ~= nil then
+				Events.Reliable[0](Value)
+			else
+				if #Queue.Reliable[0] > 256 then
+					warn("[Blink]: Event queue of \"UpdateTransformFull\" exceeded 256, did you forget to implement a listener?")
+				end
+				table.insert(Queue.Reliable[0], {Value} :: {any})
+			end
+		elseif Index == 1 then
+			Push(Queue.Reliable[1], table.pack(ReadEVENT_SpawnMob()))
 		end
 	end
 end)
@@ -385,10 +435,24 @@ local Returns = table.freeze({
 			end
 		end
 	},
+	UpdateTransformFull = {
+		On = function(Listener: (Value: { { id: number, dp: Vector3 } }) -> ()): () -> ()
+			Events.Reliable[0] = Listener
+			for Index, Arguments in Queue.Reliable[0] do
+				Listener(table.unpack(Arguments))
+			end
+			Queue.Reliable[0] = {}
+			return function (): ()
+				if Events.Reliable[0] == Listener then
+					Events.Reliable[0] = nil
+				end
+			end
+		end
+	},
 	SpawnMob = {
 		Iter = function(): () -> (number, number, CFrame, number)
 			local index = 0
-			local queue = Queue.Reliable[0]
+			local queue = Queue.Reliable[1]
 			return function (): (number, number, CFrame, number)
 				index += 1
 				local arguments = Pop(queue)
@@ -401,7 +465,7 @@ local Returns = table.freeze({
 		--- @deprecated v0.14.1 -- Use `Iter` instead.
 		Next = function(): () -> (number, number, CFrame, number)
 			local index = 0
-			local queue = Queue.Reliable[0]
+			local queue = Queue.Reliable[1]
 			return function (): (number, number, CFrame, number)
 				index += 1
 				local arguments = Pop(queue)

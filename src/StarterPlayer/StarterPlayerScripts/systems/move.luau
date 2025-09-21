@@ -42,12 +42,20 @@ end
 
 -- Delta updates: [{ id: number, dp: Vector3 }, ...]
 blink.UpdateTransformDelta.On(function(payload)
-    print("Received UpdateTransformDelta:", payload)
     for _, entry in payload do
         local e = ref("server-" .. tostring(entry.id))
         local t = ensureTransform(e)
         -- Shift position by delta while preserving rotation
         t.new = t.new + entry.dp
+        updated_models[e] = true
+    end
+end)
+
+blink.UpdateTransformFull.On(function(payload)
+    for _, entry in payload do
+        local e = ref("server-" .. tostring(entry.id))
+        local t = ensureTransform(e)
+        t.new = CFrame.new(entry.dp)  -- Absolute position
         updated_models[e] = true
     end
 end)

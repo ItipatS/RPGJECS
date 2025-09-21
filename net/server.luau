@@ -152,6 +152,7 @@ local Queue: any = {
 }
 
 export type Transform = { id: number, dp: Vector3 }
+export type TransformFull = { id: number, dp: Vector3 }
 local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector3 } }): ()
 	-- Allocate BLOCK: 3 bytes
 	local BLOCK_START = Allocate(3)
@@ -249,10 +250,42 @@ local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector
 	-- END ARRAY
 end
 
+local function WriteEVENT_UpdateTransformFull(Value: { { id: number, dp: Vector3 } }): ()
+	
+	-- Allocate BLOCK: 3 bytes
+	local BLOCK_START = Allocate(3)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
+	-- START ARRAY
+	buffer.writeu16(SendBuffer, BLOCK_START + 1, #Value)
+		-- Allocate BLOCK: 14 bytes
+	local ARRAY_START_1 = Allocate(14 * #Value)
+	for Index = 1, #Value do
+		local Item_1 = Value[Index]
+		-- Allocate 2
+		local OPERATION_OFFSET_0 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, Item_1.id)
+		local Vector = Item_1.dp
+		-- Allocate 4
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_1, Vector.X)
+		-- Allocate 4
+		local OPERATION_OFFSET_2 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_2, Vector.Y)
+		-- Allocate 4
+		local OPERATION_OFFSET_3 = ARRAY_START_1
+		ARRAY_START_1 += 4
+		buffer.writef32(SendBuffer, OPERATION_OFFSET_3, Vector.Z)
+	end
+	-- END ARRAY
+end
+
 local function WriteEVENT_SpawnMob(Value1: number, Value2: CFrame, Value3: number): ()
 	-- Allocate BLOCK: 28 bytes
 	local BLOCK_START = Allocate(28)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
+	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
 	if Value1 > 65504 then
 		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b0_11111_0000000000)
 	elseif Value1 < -65504 then
@@ -291,6 +324,12 @@ if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
 	UpdateTransformDelta = {
+		Fire = NOOP,
+		FireAll = NOOP,
+		FireList = NOOP,
+		FireExcept = NOOP
+	},
+	UpdateTransformFull = {
 		Fire = NOOP,
 		FireAll = NOOP,
 		FireList = NOOP,
@@ -412,6 +451,52 @@ local Returns = table.freeze({
 					continue
 				end
 				Unreliable:FireClient(Player, Buffer, SendInstances)
+			end
+		end,
+	},
+	UpdateTransformFull = {
+		Fire = function(Player: Player, Value: { { id: number, dp: Vector3 } }): ()
+			Load(PlayersMap[Player])
+			WriteEVENT_UpdateTransformFull(Value)
+			PlayersMap[Player] = Save()
+		end,
+		FireAll = function(Value: { { id: number, dp: Vector3 } }): ()
+			Load()
+			WriteEVENT_UpdateTransformFull(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireList = function(List: {Player}, Value: { { id: number, dp: Vector3 } }): ()
+			Load()
+			WriteEVENT_UpdateTransformFull(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in List do
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
+			end
+		end,
+		FireExcept = function(Except: Player, Value: { { id: number, dp: Vector3 } }): ()
+			Load()
+			WriteEVENT_UpdateTransformFull(Value)
+			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
+			for _, Player in Players:GetPlayers() do
+				if Player == Except then
+					continue
+				end
+				Load(PlayersMap[Player])
+				local Position = Allocate(Size)
+				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
+				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
+				PlayersMap[Player] = Save()
 			end
 		end,
 	},

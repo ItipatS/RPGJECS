@@ -18,18 +18,23 @@ local Transform = cts.Transform
 local Velocity = cts.Velocity
 local Player = cts.Player
 local Character = cts.Character
+local Size = cts.Size
 
 -- ===== Tunables =====
 local TICK_HZ = 30
 local TICK = 1 / TICK_HZ
 
-local STOP_RADIUS = 8        -- stop when closer than this
 local RESUME_RADIUS = 12     -- resume movement when farther than this (hysteresis)
 local EPS = 1e-4             -- don't send tiny deltas
 local MAX_BATCH_SIZE = 64    -- maximum deltas per network packet
 
+local lastFullSync = 0
+local FULL_SYNC_INTERVAL = 5  -- Every 5 seconds
+local STOP_RADIUS = 5
+local lastPositions: {[number]: Vector3} = {}
 local halted: {[number]: boolean} = {}
 
+local ToSendFull = table.create(128) :: { { id: number, pos: Vector3 } }
 local ToSendDelta = table.create(MAX_BATCH_SIZE) :: { { id: number, dp: Vector3 } }
 local targets: {Vector3} = table.create(16)
 
@@ -39,7 +44,7 @@ local characters = world
 	:cached()
 
 local moving_mobs = world
-	:query(Transform, Velocity)
+	:query(Transform, Velocity, Size)
 	:with(Mob)
 	:cached()
 	
@@ -65,7 +70,10 @@ local function getClosestTarget(position: Vector3): (Vector3?, number)
 end
 
 local function mobsMove(dt: number)
+
+	lastFullSync += dt
 	last_accum += dt
+
 	if last_accum < TICK then return end -- 30hz
 
 	local step_dt = last_accum
@@ -86,10 +94,11 @@ local function mobsMove(dt: number)
 
 	table.clear(ToSendDelta)
 
-	for mob, transform, speed in moving_mobs do
+	for mob, transform, speed, size in moving_mobs do
 		local cf = transform.new
 		local position = cf.Position
 
+		local stopRadius = math.max(STOP_RADIUS, size * 2)  -- Larger mobs stop farther out
 		-- Find closest player
 		local closestPos, closestDist = getClosestTarget(position)
 		if not closestPos then
@@ -105,7 +114,7 @@ local function mobsMove(dt: number)
 				isHalted = false
 			end
 		else
-			if closestDist < STOP_RADIUS then
+			if closestDist < stopRadius then
 				halted[mob] = true
 				isHalted = true
 			end
@@ -129,7 +138,7 @@ local function mobsMove(dt: number)
 		-- How far we're allowed to move this tick:
 		-- 1) natural step = speed * dt
 		-- 2) clamp so we never cross into STOP_RADIUS
-		local stepMax = math.max(0, dist - STOP_RADIUS)
+		local stepMax = math.max(0, dist - stopRadius)
 		local step = math.min(speed * step_dt, stepMax)
 
 		if step <= EPS then
@@ -146,21 +155,50 @@ local function mobsMove(dt: number)
 		-- Batch delta (skip near-zero)
 		if delta.Magnitude > EPS then
 			ToSendDelta[#ToSendDelta + 1] = { id = mob, dp = delta }
-			
 			-- Send in batches if we hit the limit (prevents packet overflow)
 			if #ToSendDelta >= MAX_BATCH_SIZE then
 				blink.UpdateTransformDelta.FireAll(ToSendDelta)
 				table.clear(ToSendDelta)
 			end
 		end
+
+		local lastPos = lastPositions[mob]
+		if lastPos and (position - lastPos).Magnitude < 0.1 and not isHalted then
+			-- Mob hasn't moved much - might be stuck
+			-- Force unhalt or add small random offset
+			halted[mob] = false
+		end
+		lastPositions[mob] = position
+
 	end
 
-	-- 🔧 FIX: Send remaining deltas after processing all mobs
-	if #ToSendDelta > 0 then
-		blink.UpdateTransformDelta.FireAll(ToSendDelta)
-	end
+	if  lastFullSync >= FULL_SYNC_INTERVAL then
+        lastFullSync = 0
+        table.clear(ToSendFull)
+        
+        for mob, transform, speed, size in moving_mobs do
+            ToSendFull[#ToSendFull + 1] = { 
+                id = mob,
+                dp = transform.new.Position
+            }
+        end
 
-	print("ToSend:", ToSendDelta)
+		if #ToSendFull >= 128 then
+				blink.UpdateTransformFull.FireAll(ToSendFull)
+				table.clear(ToSendFull)
+		end
+        -- Send full state to correct any drift
+		if #ToSendFull > 0 then
+        	blink.UpdateTransformFull.FireAll(ToSendFull)
+			table.clear(ToSendFull)
+		end
+    else
+        -- Send deltas as usual (your existing code)
+        if #ToSendDelta > 0 then
+            blink.UpdateTransformDelta.FireAll(ToSendDelta)
+			table.clear(ToSendDelta)
+        end
+    end
 end
 
 local throttle = interval(1)
@@ -174,13 +212,15 @@ local function spawnMobs()
 		local p = Vector3.new(x, 20, z)
 		local cf = CFrame.new(p)
 		local v = math.random(30, 70) -- Vary speed for more interesting behavior
-
+		local size = math.random(1,5)
 		local e = world:entity()
+
+		world:set(e, Size, size)
 		world:set(e, Velocity, v)
 		world:set(e, Transform, { new = cf })
 		world:add(e, Mob)
 
-		blink.SpawnMob.FireAll(e, cf, v)
+		blink.SpawnMob.FireAll(e, cf, size)
 	end
 end
 

@@ -5,12 +5,26 @@ struct Transform {
     id: u16,
     dp: vector<f16>,
 }
+
+struct TransformFull {
+    id: u16,
+    dp: vector<f32>,
+}
+
 event UpdateTransformDelta {
     From: Server,
     Type: Unreliable,
     Call: SingleSync,
     Poll: false,
     Data: Transform[]
+}
+
+event UpdateTransformFull {
+    From: Server,
+    Type: Reliable,    -- Must arrive to correct drift
+    Call: SingleSync, 
+    Poll: false,
+    Data: TransformFull[]
 }
 
 event SpawnMob {

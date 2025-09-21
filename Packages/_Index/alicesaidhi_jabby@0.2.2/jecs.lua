@@ -1,1 +1,1 @@
-return require(script.Parent.Parent["ukendio_jecs@0.5.5"]["jecs"])
+return require(script.Parent.Parent["ukendio_jecs@0.9.0"]["jecs"])

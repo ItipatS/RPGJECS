@@ -11,6 +11,13 @@ local components: {
 	Transform: Entity<{ new: CFrame, old: CFrame }>,
 	Velocity: Entity<number>,
 	Previous: Entity,
+	Size: Entity<number>,
+
+	--Physics)
+	Gravity: Entity<{ velocity: number, grounded: boolean }>,
+    Knockback: Entity<{ force: Vector3, remaining: number }>,
+    Collider: Entity<{ radius: number }>,
+    Grounded: Entity,
 } =
 	{
 		Character = world:component(),
@@ -21,6 +28,12 @@ local components: {
 		Transform = world:component(),
 		Velocity = world:component(),
 		Previous = world:component(),
+		Size = world:component(),
+
+		Gravity = world:component(),
+		Knockback = world:component(),
+		Collider = world:component(), 
+		Grounded = world:component(),
 	}
 
 for name, component in components :: {[string]: jecs.Entity} do 

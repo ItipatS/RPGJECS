@@ -9,12 +9,14 @@ local spawned = {}
 local pool = {}
 
 local function syncMobs()
-	for _, id, cf, vel in blink.SpawnMob.Iter() do
+	for _, id, cf, Size in blink.SpawnMob.Iter() do
 		if not spawned[id] then
 
 			local part = Instance.new("Part")
-			part.Size = Vector3.one * 5
-			part.BrickColor = BrickColor.Red()
+			part.Shape = Enum.PartType.Ball
+			part.Material = Enum.Material.Neon
+			part.Size = Size * Vector3.new(1,1,1)
+			part.Color = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
 			part.Anchored = true
 			part.CastShadow = false
 			part.CanCollide = false
@@ -29,7 +31,6 @@ local function syncMobs()
 
 			local e = ref("server-" .. tostring(id))
 			world:set(e, cts.Transform, { new = cf, old = cf })
-			world:set(e, cts.Velocity, vel)
 			world:set(e, cts.Model, model)
 			world:add(e, cts.Mob)
 
