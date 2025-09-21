@@ -23,6 +23,8 @@ local function syncMobs()
 			local model = Instance.new("Model")
 			model.PrimaryPart = part
 			part.Parent = model
+			model.Name = "Mob-" .. tostring(id)
+			model.PrimaryPart.CFrame = cf
 			model.Parent = workspace
 
 			local e = ref("server-" .. tostring(id))

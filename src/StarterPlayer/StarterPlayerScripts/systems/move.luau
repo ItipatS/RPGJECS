@@ -23,9 +23,6 @@ local TICK_HZ = 30
 local TICK = 1 / TICK_HZ
 local last = 0
 
--- Small epsilon to ignore noise
-local EPS = 1e-4
-
 -- Helper: ensure a Transform component exists with a .new CFrame
 local function ensureTransform(e: number): {new: CFrame}
     local t = world:get(e, Transform)
@@ -45,6 +42,7 @@ end
 
 -- Delta updates: [{ id: number, dp: Vector3 }, ...]
 blink.UpdateTransformDelta.On(function(payload)
+    print("Received UpdateTransformDelta:", payload)
     for _, entry in payload do
         local e = ref("server-" .. tostring(entry.id))
         local t = ensureTransform(e)

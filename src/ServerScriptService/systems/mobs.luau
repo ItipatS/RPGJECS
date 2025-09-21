@@ -26,16 +26,17 @@ local TICK = 1 / TICK_HZ
 local STOP_RADIUS = 8        -- stop when closer than this
 local RESUME_RADIUS = 12     -- resume movement when farther than this (hysteresis)
 local EPS = 1e-4             -- don't send tiny deltas
+local MAX_BATCH_SIZE = 64    -- maximum deltas per network packet
 
 local halted: {[number]: boolean} = {}
 
-local ToSendDelta = table.create(64) :: { { id: number, dp: Vector3 } }
+local ToSendDelta = table.create(MAX_BATCH_SIZE) :: { { id: number, dp: Vector3 } }
+local targets: {Vector3} = table.create(16)
 
 local characters = world
 	:query(Character)
 	:with(Player)
 	:cached()
-
 
 local moving_mobs = world
 	:query(Transform, Velocity)
@@ -44,12 +45,29 @@ local moving_mobs = world
 	
 local last_accum = 0
 
-local targets: {Vector3} = {}
+-- Optimized distance calculation (avoids sqrt when possible)
+local function getClosestTarget(position: Vector3): (Vector3?, number)
+	if #targets == 0 then return nil, math.huge end
+	
+	local closestPos: Vector3? = nil
+	local closestDistSq = math.huge
+	
+	for i = 1, #targets do
+		local target = targets[i]
+		local distSq = (target - position).Magnitude ^ 2
+		if distSq < closestDistSq then
+			closestDistSq = distSq
+			closestPos = target
+		end
+	end
+	
+	return closestPos, math.sqrt(closestDistSq)
+end
 
 local function mobsMove(dt: number)
-	
 	last_accum += dt
 	if last_accum < TICK then return end -- 30hz
+
 	local step_dt = last_accum
 	last_accum = 0
 
@@ -61,6 +79,7 @@ local function mobsMove(dt: number)
 			targets[#targets + 1] = pp.Position
 		end
 	end
+
 	if #targets == 0 then
 		return
 	end
@@ -69,26 +88,17 @@ local function mobsMove(dt: number)
 
 	for mob, transform, speed in moving_mobs do
 		local cf = transform.new
-		local p = cf.Position
+		local position = cf.Position
 
 		-- Find closest player
-		local closestPos: Vector3? = nil
-		local closestDist = math.huge
-		for i = 1, #targets do
-			local pos = targets[i]
-			local d = (pos - p).Magnitude
-			if d < closestDist then
-				closestDist = d
-				closestPos = pos
-			end
-		end
-
+		local closestPos, closestDist = getClosestTarget(position)
 		if not closestPos then
 			continue
 		end
 
 		local isHalted = halted[mob] or false
 
+		-- Hysteresis logic to prevent jittering
 		if isHalted then
 			if closestDist > RESUME_RADIUS then
 				halted[mob] = false
@@ -107,11 +117,13 @@ local function mobsMove(dt: number)
 		end
 
 		-- Move toward target, but don't overshoot past STOP_RADIUS
-		local dir = (closestPos - p)
+		local dir = (closestPos - position)
 		local dist = dir.Magnitude
+
 		if dist < EPS then
 			continue
 		end
+		
 		dir = dir / dist
 
 		-- How far we're allowed to move this tick:
@@ -126,37 +138,42 @@ local function mobsMove(dt: number)
 		end
 
 		local delta = dir * step
-		local newPos = p + delta
+		local newPos = position + delta
 
 		-- Update Transform
-		transform.new = CFrame.new(newPos)
+		transform.new = CFrame.new(newPos, cf.LookVector)
+
 		-- Batch delta (skip near-zero)
 		if delta.Magnitude > EPS then
-			-- NOTE: if your Blink event expects a different field name, adjust here.
-			ToSendDelta[#ToSendDelta+1] = { id = mob, dp = delta }
-		end
-
-		-- Flush delta batch
-		if #ToSendDelta > 0 then
-			-- You need a Blink event that accepts an array of { id: u32, dp: Vector3 }.
-			-- Example Blink schema:
-			-- event UpdateTransformDelta {
-			--   from: Server,
-			--   type: Unreliable,
-			--   call: ManySync,
-			--   data: { id: u32, dp: Vector3 }[]
-			-- }
-			blink.UpdateTransformDelta.FireAll(ToSendDelta)
+			ToSendDelta[#ToSendDelta + 1] = { id = mob, dp = delta }
+			
+			-- Send in batches if we hit the limit (prevents packet overflow)
+			if #ToSendDelta >= MAX_BATCH_SIZE then
+				blink.UpdateTransformDelta.FireAll(ToSendDelta)
+				table.clear(ToSendDelta)
+			end
 		end
 	end
+
+	-- 🔧 FIX: Send remaining deltas after processing all mobs
+	if #ToSendDelta > 0 then
+		blink.UpdateTransformDelta.FireAll(ToSendDelta)
+	end
+
+	print("ToSend:", ToSendDelta)
 end
 
 local throttle = interval(1)
 local function spawnMobs()
 	if throttle() then
-		local p = Vector3.new(math.random(0, 200), 20, math.random(0, 200))
+		-- Spawn in a more interesting pattern
+		local angle = math.random() * math.pi * 2
+		local radius = math.random(50, 150)
+		local x = math.cos(angle) * radius
+		local z = math.sin(angle) * radius
+		local p = Vector3.new(x, 20, z)
 		local cf = CFrame.new(p)
-		local v = 50
+		local v = math.random(30, 70) -- Vary speed for more interesting behavior
 
 		local e = world:entity()
 		world:set(e, Velocity, v)

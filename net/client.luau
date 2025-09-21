@@ -161,25 +161,30 @@ local function ReadEVENT_UpdateTransformDelta(): ({ { id: number, dp: Vector3 } 
 	if Length < 0 then error(`Expected "Length" to be larger than 0, got {Length} instead.`) end
 	if Length > 65535 then error(`Expected "Length" to be smaller than 65535, got {Length} instead.`) end
 	local Value = table.create(Length)
-		-- Read BLOCK: 14 bytes
-	local ARRAY_START_1 = Read(14 * Length)
+		-- Read BLOCK: 8 bytes
+	local ARRAY_START_1 = Read(8 * Length)
 	for Index = 1, Length do
 		local Item_1 = {} :: any
 		-- Read 2
 		local OPERATION_OFFSET_0 = ARRAY_START_1
 		ARRAY_START_1 += 2
-		local Encoded = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_0)
+		Item_1.id = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_0)
+		-- Read 2
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		local Encoded = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_1)
+		local X
 		local MantissaExponent = Encoded % 0x8000
 		if MantissaExponent == 0b0_11111_0000000000  then
 			if Encoded // 0x8000 == 1 then
-				Item_1.id = -math.huge
+				X = -math.huge
 			else
-				Item_1.id = math.huge
+				X = math.huge
 			end
 		elseif MantissaExponent == 0b1_11111_0000000000   then
-			Item_1.id = 0 / 0
+			X = 0 / 0
 		elseif MantissaExponent == 0b0_00000_0000000000   then
-			Item_1.id = 0
+			X = 0
 		else
 			local Mantissa = MantissaExponent % 0x400
 			local Exponent = MantissaExponent // 0x400
@@ -190,20 +195,64 @@ local function ReadEVENT_UpdateTransformDelta(): ({ { id: number, dp: Vector3 } 
 				Fraction = Mantissa / 0x800 + 0.5
 			end
 			local Result = math.ldexp(Fraction, Exponent - 14)
-			Item_1.id = if Encoded // 0x8000 == 1 then -Result else Result
+			X = if Encoded // 0x8000 == 1 then -Result else Result
 		end
-		-- Read 4
-		local OPERATION_OFFSET_1 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		local X = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_1)
-		-- Read 4
+		-- Read 2
 		local OPERATION_OFFSET_2 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		local Y = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_2)
-		-- Read 4
+		ARRAY_START_1 += 2
+		Encoded = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_2)
+		local Y
+		local MantissaExponent = Encoded % 0x8000
+		if MantissaExponent == 0b0_11111_0000000000  then
+			if Encoded // 0x8000 == 1 then
+				Y = -math.huge
+			else
+				Y = math.huge
+			end
+		elseif MantissaExponent == 0b1_11111_0000000000   then
+			Y = 0 / 0
+		elseif MantissaExponent == 0b0_00000_0000000000   then
+			Y = 0
+		else
+			local Mantissa = MantissaExponent % 0x400
+			local Exponent = MantissaExponent // 0x400
+			local Fraction;
+			if Exponent == 0 then
+				Fraction = Mantissa / 0x400
+			else
+				Fraction = Mantissa / 0x800 + 0.5
+			end
+			local Result = math.ldexp(Fraction, Exponent - 14)
+			Y = if Encoded // 0x8000 == 1 then -Result else Result
+		end
+		-- Read 2
 		local OPERATION_OFFSET_3 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		local Z = buffer.readf32(RecieveBuffer, OPERATION_OFFSET_3)
+		ARRAY_START_1 += 2
+		Encoded = buffer.readu16(RecieveBuffer, OPERATION_OFFSET_3)
+		local Z
+		local MantissaExponent = Encoded % 0x8000
+		if MantissaExponent == 0b0_11111_0000000000  then
+			if Encoded // 0x8000 == 1 then
+				Z = -math.huge
+			else
+				Z = math.huge
+			end
+		elseif MantissaExponent == 0b1_11111_0000000000   then
+			Z = 0 / 0
+		elseif MantissaExponent == 0b0_00000_0000000000   then
+			Z = 0
+		else
+			local Mantissa = MantissaExponent % 0x400
+			local Exponent = MantissaExponent // 0x400
+			local Fraction;
+			if Exponent == 0 then
+				Fraction = Mantissa / 0x400
+			else
+				Fraction = Mantissa / 0x800 + 0.5
+			end
+			local Result = math.ldexp(Fraction, Exponent - 14)
+			Z = if Encoded // 0x8000 == 1 then -Result else Result
+		end
 		Item_1.dp = Vector3.new(X, Y, Z)
 		table.insert(Value, Item_1)
 	end

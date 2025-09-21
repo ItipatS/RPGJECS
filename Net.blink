@@ -2,8 +2,8 @@ option ClientOutput = "net/client.luau"
 option ServerOutput = "net/server.luau"
 
 struct Transform {
-    id: f16,
-    dp: vector<f32>,
+    id: u16,
+    dp: vector<f16>,
 }
 event UpdateTransformDelta {
     From: Server,

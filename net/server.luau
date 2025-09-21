@@ -158,23 +158,28 @@ local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
 	-- START ARRAY
 	buffer.writeu16(SendBuffer, BLOCK_START + 1, #Value)
-		-- Allocate BLOCK: 14 bytes
-	local ARRAY_START_1 = Allocate(14 * #Value)
+		-- Allocate BLOCK: 8 bytes
+	local ARRAY_START_1 = Allocate(8 * #Value)
 	for Index = 1, #Value do
 		local Item_1 = Value[Index]
 		-- Allocate 2
 		local OPERATION_OFFSET_0 = ARRAY_START_1
 		ARRAY_START_1 += 2
-		if Item_1.id > 65504 then
-			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b0_11111_0000000000)
-		elseif Item_1.id < -65504 then
-			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b1_11111_0000000000)
-		elseif Item_1.id ~= Item_1.id then
-			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0b1_11111_0000000001)
-		elseif Item_1.id == 0 then
-			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, 0)
+		buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, Item_1.id)
+		local Vector = Item_1.dp
+		-- Allocate 2
+		local OPERATION_OFFSET_1 = ARRAY_START_1
+		ARRAY_START_1 += 2
+		if Vector.X > 65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_1, 0b0_11111_0000000000)
+		elseif Vector.X < -65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_1, 0b1_11111_0000000000)
+		elseif Vector.X ~= Vector.X then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_1, 0b1_11111_0000000001)
+		elseif Vector.X == 0 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_1, 0)
 		else
-			local float = Item_1.id
+			local float = Vector.X
 			local Abosulte = math.abs(float)
 			local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
 			local RoundedValue = (Abosulte // Interval) * Interval
@@ -186,21 +191,60 @@ local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector
 			local Result = Mantissa
 				+ math.max(Exponent, 0) * 0x400
 				+ if float < 0 then 0x8000 else 0
-			buffer.writeu16(SendBuffer, OPERATION_OFFSET_0, Result)
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_1, Result)
 		end
-		local Vector = Item_1.dp
-		-- Allocate 4
-		local OPERATION_OFFSET_1 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		buffer.writef32(SendBuffer, OPERATION_OFFSET_1, Vector.X)
-		-- Allocate 4
+		-- Allocate 2
 		local OPERATION_OFFSET_2 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		buffer.writef32(SendBuffer, OPERATION_OFFSET_2, Vector.Y)
-		-- Allocate 4
+		ARRAY_START_1 += 2
+		if Vector.Y > 65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_2, 0b0_11111_0000000000)
+		elseif Vector.Y < -65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_2, 0b1_11111_0000000000)
+		elseif Vector.Y ~= Vector.Y then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_2, 0b1_11111_0000000001)
+		elseif Vector.Y == 0 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_2, 0)
+		else
+			local float = Vector.Y
+			local Abosulte = math.abs(float)
+			local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
+			local RoundedValue = (Abosulte // Interval) * Interval
+			local Fraction, Exponent = math.frexp(RoundedValue)
+			Exponent += 14
+			local Mantissa = math.round(if Exponent <= 0
+				then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))
+				else Fraction * 0x800) % 0x400
+			local Result = Mantissa
+				+ math.max(Exponent, 0) * 0x400
+				+ if float < 0 then 0x8000 else 0
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_2, Result)
+		end
+		-- Allocate 2
 		local OPERATION_OFFSET_3 = ARRAY_START_1
-		ARRAY_START_1 += 4
-		buffer.writef32(SendBuffer, OPERATION_OFFSET_3, Vector.Z)
+		ARRAY_START_1 += 2
+		if Vector.Z > 65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_3, 0b0_11111_0000000000)
+		elseif Vector.Z < -65504 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_3, 0b1_11111_0000000000)
+		elseif Vector.Z ~= Vector.Z then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_3, 0b1_11111_0000000001)
+		elseif Vector.Z == 0 then
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_3, 0)
+		else
+			local float = Vector.Z
+			local Abosulte = math.abs(float)
+			local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
+			local RoundedValue = (Abosulte // Interval) * Interval
+			local Fraction, Exponent = math.frexp(RoundedValue)
+			Exponent += 14
+			local Mantissa = math.round(if Exponent <= 0
+				then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))
+				else Fraction * 0x800) % 0x400
+			local Result = Mantissa
+				+ math.max(Exponent, 0) * 0x400
+				+ if float < 0 then 0x8000 else 0
+			buffer.writeu16(SendBuffer, OPERATION_OFFSET_3, Result)
+		end
 	end
 	-- END ARRAY
 end
