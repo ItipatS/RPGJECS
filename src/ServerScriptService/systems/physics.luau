@@ -3,8 +3,11 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local world = require(ReplicatedStorage.std.world)
-local cts = require(ReplicatedStorage.std.components)
+local std = ReplicatedStorage.std
+local world = require(std.world)
+local cts = require(std.components)
+local scheduler = require(std.scheduler)
+local phases = require(std.phases)
 
 local Transform = cts.Transform
 local Velocity = cts.Velocity
@@ -192,9 +195,9 @@ local function terrainCollisionSystem(dt: number)
     end
 end
 
-return {
-    gravitySystem = gravitySystem,
-    knockbackSystem = knockbackSystem, 
-    collisionSystem = collisionSystem,
-    terrainCollisionSystem = terrainCollisionSystem,
-}
+--[[scheduler.SYSTEM(knockbackSystem, phases.Physics)
+scheduler.SYSTEM(gravitySystem, phases.Physics)
+scheduler.SYSTEM(terrainCollisionSystem, phases.Physics)
+scheduler.SYSTEM(collisionSystem, phases.Physics)]]
+
+return {}

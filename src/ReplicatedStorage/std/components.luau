@@ -18,8 +18,21 @@ local components: {
     Knockback: Entity<{ force: Vector3, remaining: number }>,
     Collider: Entity<{ radius: number }>,
     Grounded: Entity,
+
+	 -- Behavior Components
+    StateMachine: Entity<{ current: string, states: {[string]: any} }>,
+    ChaseTarget: Entity<{ target: number?, range: number, loseRange: number }>,
+    Patrol: Entity<{ points: {Vector3}, current: number, wait: number }>,
+    Wander: Entity<{ center: Vector3, radius: number, nextMove: number }>,
+    Aggressive: Entity<{ attackRange: number, damage: number, cooldown: number }>,
+    Flee: Entity<{ from: number?, fleeRange: number, speed: number }>,
+    
+    -- Timers/Conditions
+    Timer: Entity<{ remaining: number }>,
+    Cooldown: Entity<{ remaining: number }>,
+	PendingMovements: Entity<{ [number]:{ id: number, dp: Vector3 } }>,
 } =
-	{
+{
 		Character = world:component(),
 		Mob = world:component(),
 		Model = world:component(),
@@ -32,8 +45,18 @@ local components: {
 
 		Gravity = world:component(),
 		Knockback = world:component(),
-		Collider = world:component(), 
+		Collider = world:component(),
 		Grounded = world:component(),
+
+		StateMachine = world:component(),
+		ChaseTarget = world:component(),
+		Patrol = world:component(),
+		Wander = world:component(),
+		Aggressive = world:component(),
+		Flee = world:component(),
+		Timer = world:component(),
+		Cooldown = world:component(),
+		PendingMovements = world:component(),
 	}
 
 for name, component in components :: {[string]: jecs.Entity} do 

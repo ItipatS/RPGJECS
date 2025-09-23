@@ -19,23 +19,24 @@ local Velocity = cts.Velocity
 local Player = cts.Player
 local Character = cts.Character
 local Size = cts.Size
+local PendingMovements = cts.PendingMovements
 
+-- Data store for movements
+local SystemData = world:entity()
+world:set(SystemData, PendingMovements, {})
+
+local movements = world:get(SystemData, PendingMovements)
 -- ===== Tunables =====
 local TICK_HZ = 30
 local TICK = 1 / TICK_HZ
 
 local RESUME_RADIUS = 12     -- resume movement when farther than this (hysteresis)
 local EPS = 1e-4             -- don't send tiny deltas
-local MAX_BATCH_SIZE = 64    -- maximum deltas per network packet
 
-local lastFullSync = 0
-local FULL_SYNC_INTERVAL = 5  -- Every 5 seconds
 local STOP_RADIUS = 5
 local lastPositions: {[number]: Vector3} = {}
 local halted: {[number]: boolean} = {}
 
-local ToSendFull = table.create(128) :: { { id: number, pos: Vector3 } }
-local ToSendDelta = table.create(MAX_BATCH_SIZE) :: { { id: number, dp: Vector3 } }
 local targets: {Vector3} = table.create(16)
 
 local characters = world
@@ -47,7 +48,7 @@ local moving_mobs = world
 	:query(Transform, Velocity, Size)
 	:with(Mob)
 	:cached()
-	
+
 local last_accum = 0
 
 -- Optimized distance calculation (avoids sqrt when possible)
@@ -70,8 +71,6 @@ local function getClosestTarget(position: Vector3): (Vector3?, number)
 end
 
 local function mobsMove(dt: number)
-
-	lastFullSync += dt
 	last_accum += dt
 
 	if last_accum < TICK then return end -- 30hz
@@ -92,11 +91,11 @@ local function mobsMove(dt: number)
 		return
 	end
 
-	table.clear(ToSendDelta)
-
+	table.clear(movements)
 	for mob, transform, speed, size in moving_mobs do
 		local cf = transform.new
 		local position = cf.Position
+		
 
 		local stopRadius = math.max(STOP_RADIUS, size * 2)  -- Larger mobs stop farther out
 		-- Find closest player
@@ -154,12 +153,8 @@ local function mobsMove(dt: number)
 
 		-- Batch delta (skip near-zero)
 		if delta.Magnitude > EPS then
-			ToSendDelta[#ToSendDelta + 1] = { id = mob, dp = delta }
-			-- Send in batches if we hit the limit (prevents packet overflow)
-			if #ToSendDelta >= MAX_BATCH_SIZE then
-				blink.UpdateTransformDelta.FireAll(ToSendDelta)
-				table.clear(ToSendDelta)
-			end
+			movements[#movements+1] = { id = mob, dp = delta }
+			world:set(SystemData, PendingMovements, movements)
 		end
 
 		local lastPos = lastPositions[mob]
@@ -171,34 +166,11 @@ local function mobsMove(dt: number)
 		lastPositions[mob] = position
 
 	end
+--[[
+	for e, pendingMovements in world:query(PendingMovements) do
+		print("id", e, pendingMovements)
+	end]]
 
-	if  lastFullSync >= FULL_SYNC_INTERVAL then
-        lastFullSync = 0
-        table.clear(ToSendFull)
-        
-        for mob, transform, speed, size in moving_mobs do
-            ToSendFull[#ToSendFull + 1] = { 
-                id = mob,
-                dp = transform.new.Position
-            }
-        end
-
-		if #ToSendFull >= 128 then
-				blink.UpdateTransformFull.FireAll(ToSendFull)
-				table.clear(ToSendFull)
-		end
-        -- Send full state to correct any drift
-		if #ToSendFull > 0 then
-        	blink.UpdateTransformFull.FireAll(ToSendFull)
-			table.clear(ToSendFull)
-		end
-    else
-        -- Send deltas as usual (your existing code)
-        if #ToSendDelta > 0 then
-            blink.UpdateTransformDelta.FireAll(ToSendDelta)
-			table.clear(ToSendDelta)
-        end
-    end
 end
 
 local throttle = interval(1)

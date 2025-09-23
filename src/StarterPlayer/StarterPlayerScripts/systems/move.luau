@@ -18,8 +18,8 @@ local moved_models = world:query(Model, Transform):cached()
 -- Track which entities received a transform change this network tick
 local updated_models: {[number]: true} = {}
 
--- --- timing (30 Hz presentation) ---
-local TICK_HZ = 30
+-- --- timing (60 Hz presentation) ---
+local TICK_HZ = 60
 local TICK = 1 / TICK_HZ
 local last = 0
 
@@ -51,17 +51,17 @@ blink.UpdateTransformDelta.On(function(payload)
     end
 end)
 
+-- Full updates: [{ id: number, dp: Vector3 }, ...]
 blink.UpdateTransformFull.On(function(payload)
     for _, entry in payload do
         local e = ref("server-" .. tostring(entry.id))
         local t = ensureTransform(e)
-        t.new = CFrame.new(entry.dp)  -- Absolute position
+        t.new = CFrame.new(entry.dp)
         updated_models[e] = true
     end
 end)
 
-
--- 30 Hz presentation: push ECS Transform -> Roblox Model.PrimaryPart.CFrame
+-- 60 Hz presentation: push ECS Transform -> Roblox Model.PrimaryPart.CFrame
 local function present(dt: number)
     last += dt
     if last < TICK then return end
@@ -79,19 +79,7 @@ local function present(dt: number)
     end
 end
 
--- If you want a very light fairness/yield step you can keep this; otherwise remove it.
-local i = 0
-local function processed(n: number)
-    i += 1
-    if i > n then
-        i = 0
-        return true
-    end
-    return false
-end
-
 local scheduler = require(std.scheduler)
-scheduler.SYSTEM(processed)  -- optional; safe to remove
 scheduler.SYSTEM(present)
 
 return 0

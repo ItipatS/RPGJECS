@@ -8,6 +8,10 @@ local spawned = {}
 
 local pool = {}
 
+local MobsFolder = Instance.new("Folder")
+MobsFolder.Name = "Mobs"
+MobsFolder.Parent = workspace
+
 local function syncMobs()
 	for _, id, cf, Size in blink.SpawnMob.Iter() do
 		if not spawned[id] then
@@ -27,7 +31,7 @@ local function syncMobs()
 			part.Parent = model
 			model.Name = "Mob-" .. tostring(id)
 			model.PrimaryPart.CFrame = cf
-			model.Parent = workspace
+			model.Parent = MobsFolder
 
 			local e = ref("server-" .. tostring(id))
 			world:set(e, cts.Transform, { new = cf, old = cf })
