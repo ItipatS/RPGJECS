@@ -15,13 +15,70 @@ local Transform = cts.Transform
 -- Query: entities that have a Roblox model and a Transform
 local moved_models = world:query(Model, Transform):cached()
 
--- Track which entities received a transform change this network tick
-local updated_models: {[number]: true} = {}
+-- ---------- Smooth interpolation state ----------
+-- For each entity we keep a small state machine:
+-- prev -> next over 'span' seconds, with alpha advancing each frame.
+type Smooth = {
+    prev: CFrame,
+    next: CFrame,
+    rendered: CFrame,  -- last frame’s output
+    alpha: number,     -- [0..1]
+    span: number,      -- seconds to complete the blend
+}
 
--- --- timing (60 Hz presentation) ---
-local TICK_HZ = 60
-local TICK = 1 / TICK_HZ
-local last = 0
+local smooth: { [number]: Smooth } = {}
+
+-- Pick a blend time ~ network period (12 Hz ~= 0.083s).
+-- A bit longer is nicer; tweak to taste.
+local TARGET_SPAN = 0.10   -- 100 ms
+local MIN_SPAN    = 1/120  -- never 0; avoids huge alpha steps
+local MAX_SPAN    = 0.25   -- don't smear too long
+
+local function beginBlend(e: number, serverCF: CFrame)
+    local s = smooth[e]
+    if not s then
+        -- first time: start at server pose (no pop)
+        s = {
+            prev = serverCF,
+            next = serverCF,
+            rendered = serverCF,
+            alpha = 1,
+            span = TARGET_SPAN,
+        }
+        smooth[e] = s
+        return
+    end
+
+    -- Start new blend FROM what we actually rendered last frame (no rewind)
+    local start = s.rendered
+    s.prev = start
+    s.next = serverCF
+
+    -- Optional: dynamic span based on travel distance (longer jump = slightly longer smoothing)
+    local dist = (s.next.Position - s.prev.Position).Magnitude
+    local span = TARGET_SPAN
+    if dist > 10 then
+        span = math.clamp(TARGET_SPAN * 1.5, MIN_SPAN, MAX_SPAN)
+    end
+
+    s.span  = math.clamp(span, MIN_SPAN, MAX_SPAN)
+    s.alpha = 0
+end
+
+local function stepBlend(e: number, dt: number): CFrame?
+    local s = smooth[e]
+    if not s then return nil end
+    -- advance
+    if s.alpha < 1 then
+        -- normalize dt by span, clamp so big hitches don’t overshoot badly
+        local da = math.clamp(dt / s.span, 0, 0.5)
+        s.alpha = math.min(1, s.alpha + da)
+    end
+    -- CFrame:Lerp blends pos+rot (slerp-like)
+    local out = s.prev:Lerp(s.next, s.alpha)
+    s.rendered = out
+    return out
+end
 
 -- Helper: ensure a Transform component exists with a .new CFrame
 local function ensureTransform(e: number): {new: CFrame}
@@ -44,10 +101,13 @@ end
 blink.UpdateTransformDelta.On(function(payload)
     for _, entry in payload do
         local e = ref("server-" .. tostring(entry.id))
+
+        -- authoritatively advance ECS Transform
         local t = ensureTransform(e)
-        -- Shift position by delta while preserving rotation
         t.new = t.new + entry.dp
-        updated_models[e] = true
+
+        -- start a smooth blend FROM current rendered TO new server pose
+        beginBlend(e, t.new)
     end
 end)
 
@@ -55,25 +115,33 @@ end)
 blink.UpdateTransformFull.On(function(payload)
     for _, entry in payload do
         local e = ref("server-" .. tostring(entry.id))
+        local cf = if entry.r
+            then CFrame.new(entry.dp) * CFrame.Angles(0, entry.r, 0)
+            else CFrame.new(entry.dp)
+
         local t = ensureTransform(e)
-        t.new = CFrame.new(entry.dp)
-        updated_models[e] = true
+        t.new = cf
+
+        beginBlend(e, cf)
     end
 end)
 
--- 60 Hz presentation: push ECS Transform -> Roblox Model.PrimaryPart.CFrame
-local function present(dt: number)
-    last += dt
-    if last < TICK then return end
-    last = 0
+-- ---------- 60 Hz presentation ----------
+local RENDER_HZ = 60
+local RENDER_DT = 1 / RENDER_HZ
+local acc = 0
 
-    for e, model, transform in moved_models do
-        if updated_models[e] then
-            updated_models[e] = nil
-            local m = model :: Model
-            local t = transform :: {new: CFrame}
-            if m and m.PrimaryPart and t and t.new then
-                m.PrimaryPart.CFrame = t.new
+local function present(dt: number)
+    acc += dt
+    if acc < RENDER_DT then return end
+    acc = 0
+
+    for e, model, _ in moved_models do
+        local m = (model :: Model)
+        if m and m.PrimaryPart then
+            local cf = stepBlend(e, RENDER_DT)
+            if cf then
+                m.PrimaryPart.CFrame = cf
             end
         end
     end

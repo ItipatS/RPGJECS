@@ -30,9 +30,9 @@ local components: {
     -- Timers/Conditions
     Timer: Entity<{ remaining: number }>,
     Cooldown: Entity<{ remaining: number }>,
-	PendingMovements: Entity<{ [number]:{ id: number, dp: Vector3 } }>,
-} =
-{
+	PendingMovements: Entity<{ [number]:{ id:number, dp: Vector3 } }>,
+	PendingStateChanges: Entity<{ [number]:{ id:number,  state: string } }>,
+} = {
 		Character = world:component(),
 		Mob = world:component(),
 		Model = world:component(),
@@ -57,6 +57,7 @@ local components: {
 		Timer = world:component(),
 		Cooldown = world:component(),
 		PendingMovements = world:component(),
+		PendingStateChanges = world:component(),
 	}
 
 for name, component in components :: {[string]: jecs.Entity} do 

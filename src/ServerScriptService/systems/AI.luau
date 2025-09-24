@@ -27,6 +27,7 @@ local PendingMovements = cts.PendingMovements
 local SystemData = world:entity()
 world:set(SystemData, PendingMovements, {})
 ]]
+local SystemData = world:query(PendingMovements):cached()
 
 -- Utility functions
 local function getPlayerPositions(): {Vector3}

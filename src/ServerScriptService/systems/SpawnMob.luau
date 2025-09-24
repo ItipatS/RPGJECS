@@ -21,7 +21,9 @@ local Wander = cts.Wander
 local Patrol = cts.Patrol
 local Timer = cts.Timer
 
-local throttle = interval(1)
+local throttle = interval(.1)
+local counter = interval(1)
+local count = 0
 
 local function randomPosition()
     local angle = math.random() * math.pi * 2
@@ -31,7 +33,7 @@ local function randomPosition()
     return Vector3.new(x, 20, z)
 end
 
-local function spawnSystem()
+--[[local function spawnSystem()
     if throttle() then
 
         local e = world:entity()
@@ -85,9 +87,32 @@ local function spawnSystem()
         
         blink.SpawnMob.FireAll(e, cf, world:get(e, Size))
     end
+end]]
+
+local function spawnMobs()
+	if throttle() then
+		local cf = CFrame.new(randomPosition())
+		local v = math.random(30, 70) -- Vary speed for more interesting behavior
+		local size = math.random(1,5)
+		local e = world:entity()
+
+		world:set(e, Size, size)
+		world:set(e, Velocity, v)
+		world:set(e, Transform, { new = cf })
+		world:add(e, Mob)
+
+		blink.SpawnMob.FireAll(e, cf, size)
+        count += 1
+	end
 end
 
--- Spawn mobs on Heartbeat (independent of other systems)
---scheduler.SYSTEM(spawnSystem, phases.Heartbeat)
+local function countMobs()
+    if counter() then
+        print("Current mob count:", count)
+    end
+end
 
+--Spawn mobs on Heartbeat (independent of other systems)
+scheduler.SYSTEM(spawnMobs, phases.Heartbeat)
+scheduler.SYSTEM(countMobs, phases.Heartbeat)
 return {}

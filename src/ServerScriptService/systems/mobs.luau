@@ -3,15 +3,14 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local blink = require(game:GetService("ServerScriptService").net)
 local jecs = require(ReplicatedStorage.ecs)
 local __ = jecs.Wildcard
 local std = ReplicatedStorage.std
-local ref = require(std.ref)
-local interval = require(std.interval)
+local scheduler = require(std.scheduler)
 
 local world = require(std.world)
 local cts = require(std.components)
+local mailbox = require(std.mailbox)
 
 local Mob = cts.Mob
 local Transform = cts.Transform
@@ -19,15 +18,9 @@ local Velocity = cts.Velocity
 local Player = cts.Player
 local Character = cts.Character
 local Size = cts.Size
-local PendingMovements = cts.PendingMovements
 
--- Data store for movements
-local SystemData = world:entity()
-world:set(SystemData, PendingMovements, {})
-
-local movements = world:get(SystemData, PendingMovements)
 -- ===== Tunables =====
-local TICK_HZ = 30
+local TICK_HZ = 20
 local TICK = 1 / TICK_HZ
 
 local RESUME_RADIUS = 12     -- resume movement when farther than this (hysteresis)
@@ -91,7 +84,6 @@ local function mobsMove(dt: number)
 		return
 	end
 
-	table.clear(movements)
 	for mob, transform, speed, size in moving_mobs do
 		local cf = transform.new
 		local position = cf.Position
@@ -153,8 +145,7 @@ local function mobsMove(dt: number)
 
 		-- Batch delta (skip near-zero)
 		if delta.Magnitude > EPS then
-			movements[#movements+1] = { id = mob, dp = delta }
-			world:set(SystemData, PendingMovements, movements)
+			mailbox.push(cts.PendingMovements, { id = mob, dp = delta })
 		end
 
 		local lastPos = lastPositions[mob]
@@ -166,39 +157,8 @@ local function mobsMove(dt: number)
 		lastPositions[mob] = position
 
 	end
---[[
-	for e, pendingMovements in world:query(PendingMovements) do
-		print("id", e, pendingMovements)
-	end]]
-
 end
 
-local throttle = interval(1)
-local function spawnMobs()
-	if throttle() then
-		-- Spawn in a more interesting pattern
-		local angle = math.random() * math.pi * 2
-		local radius = math.random(50, 150)
-		local x = math.cos(angle) * radius
-		local z = math.sin(angle) * radius
-		local p = Vector3.new(x, 20, z)
-		local cf = CFrame.new(p)
-		local v = math.random(30, 70) -- Vary speed for more interesting behavior
-		local size = math.random(1,5)
-		local e = world:entity()
-
-		world:set(e, Size, size)
-		world:set(e, Velocity, v)
-		world:set(e, Transform, { new = cf })
-		world:add(e, Mob)
-
-		blink.SpawnMob.FireAll(e, cf, size)
-	end
-end
-
-local scheduler = require(std.scheduler)
-
-scheduler.SYSTEM(spawnMobs)
 scheduler.SYSTEM(mobsMove)
 
 return 0
