@@ -1,8 +1,0 @@
-[package]
-name = "mattschrubb/zoneplus"
-description = "ZonePlus by 1ForeverHD"
-version = "3.2.0"
-registry = "https://github.com/UpliftGames/wally-index"
-realm = "shared"
-
-[dependencies]

@@ -79,6 +79,6 @@ local function networkSystem(dt: number)
     end
 end
 
-scheduler.SYSTEM(networkSystem, phases.NetworkDelta)
+--scheduler.SYSTEM(networkSystem, phases.NetworkDelta)
 
 return {}

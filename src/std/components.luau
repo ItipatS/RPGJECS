@@ -1,3 +1,5 @@
+--ReplicatedStorage/std/components.luau
+
 local jecs = require(game:GetService("ReplicatedStorage").ecs)
 local world = require(script.Parent.world)
 
@@ -13,13 +15,7 @@ local components: {
 	Velocity: Entity<Vector3>,
 	Previous: Entity,
 	Size: Entity<number>,
-
-	--Physics)
-	Gravity: Entity<{ vy: number, enabled: boolean? }>,
-    Knockback: Entity<{ force: Vector3, remaining: number }>,
-	StaticCollider: Entity<{size:Vector3, center: Vector3?}>,
-    Collider: Entity<{ radius: number }>,
-    Grounded: Entity,
+	Hitbox: Entity<Part>,
 
 	 -- Behavior Components
     StateMachine: Entity<{ current: string, states: {[string]: any} }>,
@@ -33,8 +29,27 @@ local components: {
     -- Timers/Conditions
     Timer: Entity<{ remaining: number }>,
     Cooldown: Entity<{ remaining: number }>,
-	PendingMovements: Entity<{ [number]:{ id:number, dp: Vector3 } }>,
 	PendingStateChanges: Entity<{ [number]:{ id:number,  state: string } }>,
+
+	--movement intent
+	Locomotion: Entity<{ dir: Vector3, speed: number }>,
+
+	 Traits: Entity<{
+        baseSpeedMul: number,
+        chaseWeight: number,
+        fleeWeight: number,
+        circleWeight: number,
+        jumpWeight: number,
+        fleeDistance: number,
+        preferDistance: number,
+    }>,
+
+	AIState: Entity<{
+        state: string,   -- "wander" | "chase" | "flee" | "circle"
+        t: number,       -- time spent in state
+        dur: number,     -- how long to stay in state (seconds)
+        circleSign: number, -- +1 / -1 for circle direction
+    }>,
 } = {
 		Character = world:component(),
 		Mob = world:component(),
@@ -47,11 +62,7 @@ local components: {
 		Previous = world:component(),
 		Size = world:component(),
 
-		Gravity = world:component(),
-		Knockback = world:component(),
-		Collider = world:component(),
-		StaticCollider = world:component(),
-		Grounded = world:component(),
+		Hitbox = world:component(),
 
 		StateMachine = world:component(),
 		ChaseTarget = world:component(),
@@ -61,8 +72,12 @@ local components: {
 		Flee = world:component(),
 		Timer = world:component(),
 		Cooldown = world:component(),
-		PendingMovements = world:component(),
 		PendingStateChanges = world:component(),
+
+		Locomotion = world:component(),
+
+		Traits      = world:component(),
+    	AIState     = world:component(),
 	}
 
 for name, component in components :: {[string]: jecs.Entity} do 

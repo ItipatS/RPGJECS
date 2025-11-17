@@ -12,7 +12,7 @@ local function start(modules)
 	end
 	local events = scheduler.COLLECT()
 	scheduler.BEGIN(events)
-	jabby.set_check_function(function(player)
+	--[[jabby.set_check_function(function(player)
 		return true
 	end)
 	if RunService:IsClient() then
@@ -28,7 +28,7 @@ local function start(modules)
 				client.spawn_app(client.apps.home)
 			end
 		end)
-	end
+	end]]
 end
 
 return start

@@ -25,6 +25,7 @@ struct TransformFull {
     dp: vector<f32>,
 }
 
+<<<<<<< HEAD
 struct spawnMob {
     id: u16,
     cframe: CFrame,
@@ -34,6 +35,12 @@ struct spawnMob {
 struct DespawnMob {
     id: u16,
     reason: u8,
+=======
+struct SpawnMob {
+    ID: u8,
+    cframe: CFrame,
+    size: f16,
+>>>>>>> ai
 }
 
 event UpdateTransformDelta {
@@ -56,6 +63,7 @@ event SpawnMob {
     From: Server,
     Type: Reliable,
     Call: SingleSync,
+<<<<<<< HEAD
     Poll: false,
     Data: spawnMob[]
 }
@@ -75,3 +83,8 @@ event UpdateMobsState {
     Poll: false,
     Data: MobsState[]
 }   
+=======
+    Poll: true,
+    Data: SpawnMob
+}
+>>>>>>> ai
