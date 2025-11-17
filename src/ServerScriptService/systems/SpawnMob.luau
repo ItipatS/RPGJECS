@@ -4,7 +4,6 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local blink = require(game:GetService("ServerScriptService").net)
 
 local std = ReplicatedStorage.std
 local interval = require(std.interval)
@@ -14,7 +13,6 @@ local scheduler = require(std.scheduler)
 local phases = require(std.phases)
 
 local Transform = cts.Transform
-local Speed = cts.Speed
 local Velocity = cts.Velocity
 local Size = cts.Size
 local Mob = cts.Mob
