@@ -1,19 +1,19 @@
+--StarterPlayer/StarterPlayerScripts/systems/move.luau
 --!optimize 2
 --!native
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local blink = require(ReplicatedStorage.net)
 local std = ReplicatedStorage.std
 local world = require(std.world)
-local ref = require(std.ref)
+local scheduler = require(std.scheduler)
 
 local cts = require(std.components)
 local Model = cts.Model
 local Transform = cts.Transform
+local Hitbox = cts.Hitbox
 
--- Query: entities that have a Roblox model and a Transform
-local moved_models = world:query(Model, Transform):cached()
+local moved_mobs = world:query(Model, Transform,Hitbox):with(cts.Mob):cached()
 
 -- ---------- Smooth interpolation state ----------
 -- For each entity we keep a small state machine:
@@ -80,74 +80,31 @@ local function stepBlend(e: number, dt: number): CFrame?
     return out
 end
 
--- Helper: ensure a Transform component exists with a .new CFrame
-local function ensureTransform(e: number): {new: CFrame}
-    local t = world:get(e, Transform)
-    if t == nil then
-        -- initialize with identity if missing (should be rare)
-        t = { new = CFrame.new() }
-        world:set(e, Transform, t)
-    elseif t.new == nil then
-        -- normalize shape if someone set Transform = CFrame by mistake
-        t = { new = (t :: any) :: CFrame }
-        world:set(e, Transform, t)
-    end
-    return t :: {new: CFrame}
-end
-
--- --- Network handlers (register once) ---
-
--- Delta updates: [{ id: number, dp: Vector3 }, ...]
-blink.UpdateTransformDelta.On(function(payload)
-    for _, entry in payload do
-        local e = ref("server-" .. tostring(entry.id))
-
-        -- authoritatively advance ECS Transform
-        local t = ensureTransform(e)
-        t.new = t.new + entry.dp
-
-        -- start a smooth blend FROM current rendered TO new server pose
-        beginBlend(e, t.new)
-    end
-end)
-
--- Full updates: [{ id: number, dp: Vector3 }, ...]
-blink.UpdateTransformFull.On(function(payload)
-    for _, entry in payload do
-        local e = ref("server-" .. tostring(entry.id))
-        local cf = if entry.r
-            then CFrame.new(entry.dp) * CFrame.Angles(0, entry.r, 0)
-            else CFrame.new(entry.dp)
-
-        local t = ensureTransform(e)
-        t.new = cf
-
-        beginBlend(e, cf)
-    end
-end)
-
 -- ---------- 60 Hz presentation ----------
 local RENDER_HZ = 60
 local RENDER_DT = 1 / RENDER_HZ
 local acc = 0
 
 local function present(dt: number)
-    acc += dt
-    if acc < RENDER_DT then return end
-    acc = 0
+	acc += dt
+	if acc < RENDER_DT then return end
+	acc = 0
+	for e, model, transform, hitbox in moved_mobs do
+		if model.PrimaryPart and hitbox then
+			-- target from Roblox replication
+			local serverCF = hitbox.CFrame
+			transform.new = serverCF
 
-    for e, model, _ in moved_models do
-        local m = (model :: Model)
-        if m and m.PrimaryPart then
-            local cf = stepBlend(e, RENDER_DT)
-            if cf then
-                m.PrimaryPart.CFrame = cf
-            end
-        end
-    end
+			-- drive smoothing
+			beginBlend(e, serverCF)
+			local cf = stepBlend(e, RENDER_DT)
+			if cf then
+				model:PivotTo(cf)
+			end
+		end
+	end
 end
 
-local scheduler = require(std.scheduler)
 scheduler.SYSTEM(present)
 
 return 0

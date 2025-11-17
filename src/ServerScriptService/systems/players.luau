@@ -1,9 +1,7 @@
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local std = ReplicatedStorage.std
 local ref = require(std.ref)
-local collect = require(std.collect)
 
 local cts = require(std.components)
 local world = require(std.world)

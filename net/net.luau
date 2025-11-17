@@ -251,7 +251,6 @@ local function WriteEVENT_UpdateTransformDelta(Value: { { id: number, dp: Vector
 end
 
 local function WriteEVENT_UpdateTransformFull(Value: { { id: number, dp: Vector3 } }): ()
-	
 	-- Allocate BLOCK: 3 bytes
 	local BLOCK_START = Allocate(3)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 0)
@@ -282,44 +281,6 @@ local function WriteEVENT_UpdateTransformFull(Value: { { id: number, dp: Vector3
 	-- END ARRAY
 end
 
-local function WriteEVENT_SpawnMob(Value1: number, Value2: CFrame, Value3: number): ()
-	-- Allocate BLOCK: 28 bytes
-	local BLOCK_START = Allocate(28)
-	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
-	if Value1 > 65504 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b0_11111_0000000000)
-	elseif Value1 < -65504 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b1_11111_0000000000)
-	elseif Value1 ~= Value1 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0b1_11111_0000000001)
-	elseif Value1 == 0 then
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, 0)
-	else
-		local float = Value1
-		local Abosulte = math.abs(float)
-		local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)
-		local RoundedValue = (Abosulte // Interval) * Interval
-		local Fraction, Exponent = math.frexp(RoundedValue)
-		Exponent += 14
-		local Mantissa = math.round(if Exponent <= 0
-			then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))
-			else Fraction * 0x800) % 0x400
-		local Result = Mantissa
-			+ math.max(Exponent, 0) * 0x400
-			+ if float < 0 then 0x8000 else 0
-		buffer.writeu16(SendBuffer, BLOCK_START + 1, Result)
-	end
-	local Vector = Value2.Position
-	buffer.writef32(SendBuffer, BLOCK_START + 3, Vector.X)
-	buffer.writef32(SendBuffer, BLOCK_START + 7, Vector.Y)
-	buffer.writef32(SendBuffer, BLOCK_START + 11, Vector.Z)
-	local rX, rY, rZ = Value2:ToOrientation()
-	buffer.writef32(SendBuffer, BLOCK_START + 15, rX)
-	buffer.writef32(SendBuffer, BLOCK_START + 19, rY)
-	buffer.writef32(SendBuffer, BLOCK_START + 23, rZ)
-	buffer.writeu8(SendBuffer, BLOCK_START + 27, Value3)
-end
-
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
@@ -330,12 +291,6 @@ if not RunService:IsRunning() then
 		FireExcept = NOOP
 	},
 	UpdateTransformFull = {
-		Fire = NOOP,
-		FireAll = NOOP,
-		FireList = NOOP,
-		FireExcept = NOOP
-	},
-	SpawnMob = {
 		Fire = NOOP,
 		FireAll = NOOP,
 		FireList = NOOP,
@@ -487,52 +442,6 @@ local Returns = table.freeze({
 		FireExcept = function(Except: Player, Value: { { id: number, dp: Vector3 } }): ()
 			Load()
 			WriteEVENT_UpdateTransformFull(Value)
-			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
-			for _, Player in Players:GetPlayers() do
-				if Player == Except then
-					continue
-				end
-				Load(PlayersMap[Player])
-				local Position = Allocate(Size)
-				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
-				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
-				PlayersMap[Player] = Save()
-			end
-		end,
-	},
-	SpawnMob = {
-		Fire = function(Player: Player, Value1: number, Value2: CFrame, Value3: number): ()
-			Load(PlayersMap[Player])
-			WriteEVENT_SpawnMob(Value1, Value2, Value3)
-			PlayersMap[Player] = Save()
-		end,
-		FireAll = function(Value1: number, Value2: CFrame, Value3: number): ()
-			Load()
-			WriteEVENT_SpawnMob(Value1, Value2, Value3)
-			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
-			for _, Player in Players:GetPlayers() do
-				Load(PlayersMap[Player])
-				local Position = Allocate(Size)
-				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
-				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
-				PlayersMap[Player] = Save()
-			end
-		end,
-		FireList = function(List: {Player}, Value1: number, Value2: CFrame, Value3: number): ()
-			Load()
-			WriteEVENT_SpawnMob(Value1, Value2, Value3)
-			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
-			for _, Player in List do
-				Load(PlayersMap[Player])
-				local Position = Allocate(Size)
-				buffer.copy(SendBuffer, Position, Buffer, 0, Size)
-				table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)
-				PlayersMap[Player] = Save()
-			end
-		end,
-		FireExcept = function(Except: Player, Value1: number, Value2: CFrame, Value3: number): ()
-			Load()
-			WriteEVENT_SpawnMob(Value1, Value2, Value3)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
 			for _, Player in Players:GetPlayers() do
 				if Player == Except then

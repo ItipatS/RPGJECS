@@ -1,76 +1,47 @@
 {
-    "name": "demo",
-    "tree": {
-        "$className": "DataModel",
-        "ReplicatedStorage": {
-            "$className": "ReplicatedStorage",
-            "$path": "src/ReplicatedStorage",
-            "ecs": {
-                "$path": "src/jecs.luau"
-            },
-            "net": {
-                "$path": "net/client.luau"
-            },
-            "Packages": {
-                "$path": "Packages"
-            }
-        },
-        "ServerScriptService": {
-            "$className": "ServerScriptService",
-            "$path": "src/ServerScriptService",
-            "net": {
-                "$path": "net/server.luau"
-            }
-        },
-        "StarterPlayer": {
-            "StarterPlayerScripts": {
-                "$path": "src/StarterPlayer/StarterPlayerScripts"
-            }
-        },
-    "Workspace": {
-      "$properties": {
-        "FilteringEnabled": true
+  "name": "demo",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Packages": {
+        "$path": "Packages"
       },
-      "Baseplate": {
-        "$className": "Part",
+      "ecs": {
+        "$path": "src/jecs.luau"
+      },
+      "ecs_init": {
+        "$className": "ModuleScript",
         "$properties": {
-          "Anchored": true,
-          "Color": [
-            0.38823,
-            0.37254,
-            0.38823
-          ],
-          "Locked": true,
-          "Position": [
-            0,
-            -10,
-            0
-          ],
-          "Size": [
-            512,
-            20,
-            512
-          ]
+          "Source": "_G.JECS_DEBUG = true\n_G.JECS_HI_COMPONENT_ID = 32\nrequire(game:GetService(\"ReplicatedStorage\").ecs)\nreturn\n"
         }
+      },
+      "net": {
+        "$path": "net/client.luau"
+      },
+      "start": {
+        "$className": "ModuleScript",
+        "$properties": {
+          "Source": "local ReplicatedStorage = game:GetService(\"ReplicatedStorage\")\nlocal RunService = game:GetService(\"RunService\")\nlocal UserInputService = game:GetService(\"UserInputService\")\nlocal jabby = require(ReplicatedStorage.Packages.jabby)\nlocal std = ReplicatedStorage.std\nlocal scheduler = require(std.scheduler)\nlocal world = require(std.world)\n\nlocal function start(modules)\n\tfor _, module in modules do\n\t\trequire(module)\n\tend\n\tlocal events = scheduler.COLLECT()\n\tscheduler.BEGIN(events)\n\tjabby.set_check_function(function(player)\n\t\treturn true\n\tend)\n\tif RunService:IsClient() then\n\t\tlocal player = game:GetService(\"Players\").LocalPlayer\n\t\tlocal playergui = player:WaitForChild(\"PlayerGui\")\n\t\tlocal client = jabby.obtain_client()\n\t\tUserInputService.InputBegan:Connect(function(input)\n\t\t\tif input.KeyCode == Enum.KeyCode.F4 then\n\t\t\t\tlocal home = playergui:FindFirstChild(\"Home\")\n\t\t\t\tif home then\n\t\t\t\t\thome:Destroy()\n\t\t\t\tend\n\t\t\t\tclient.spawn_app(client.apps.home)\n\t\t\tend\n\t\tend)\n\tend\nend\n\nreturn start\n"
+        }
+      },
+      "std": {
+        "$path": "src/std"
       }
     },
-    "Lighting": {
-      "$properties": {
-        "Ambient": [
-          0,
-          0,
-          0
-        ],
-        "Brightness": 2,
-        "GlobalShadows": true,
-        "Outlines": false,
-        "Technology": "Voxel"
+    "ServerScriptService": {
+      "$path": "src/ServerScriptService",
+      "net": {
+        "$path": "net/server.luau"
       }
     },
-    "SoundService": {
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
+      },
       "$properties": {
-        "RespectFilteringEnabled": true
+        "CharacterUseJumpPower": false,
+        "CameraMaxZoomDistance": 128
       }
     }
-    }
+  }
 }

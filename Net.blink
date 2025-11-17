@@ -11,6 +11,12 @@ struct TransformFull {
     dp: vector<f32>,
 }
 
+struct SpawnMob {
+    ID: u8,
+    cframe: CFrame,
+    size: f16,
+}
+
 event UpdateTransformDelta {
     From: Server,
     Type: Unreliable,
@@ -32,5 +38,5 @@ event SpawnMob {
     Type: Reliable,
     Call: SingleSync,
     Poll: true,
-    Data: (f16, CFrame, u8)
+    Data: SpawnMob
 }
