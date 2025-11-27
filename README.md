@@ -9,11 +9,12 @@ The core goal is to show how far I can push:
 - **Smooth visual interpolation on the client**
 
 The current demo runs **~150 server-driven mobs** with behavior logic and pathing, using **~80 KB/s of network intake** on the client, while all visual motion is **client-side interpolated**.
-
+# Demo Place
+https://www.roblox.com/games/104444037041931/RPGJECS-DEMO
 ---
 ## Demo Video
 
-[![Watch the video](https://img.youtube.com/vi/SmI4C2KEHj0/0.jpg)](https://youtu.be/SmI4C2KEHj0)
+[![Watch the video](https://img.youtube.com/vi/eprIcdV42WM/0.jpg)](https://youtu.be/eprIcdV42WM)
 
 ##  Highlights
 
